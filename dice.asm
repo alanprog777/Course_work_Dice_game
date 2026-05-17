@@ -30,6 +30,7 @@ section '.data' writable
     msg_guess    db 0x0A, 'Введите задуманное число: ', 0
     msg_bet      db 'Введите вашу ставку: ', 0
 
+    msg_err_fmt  db '!!! ОШИБКА: Некорректный ввод! Введите только целое положительное число.', 0x0A, 0
     msg_err_rng  db '!!! ОШИБКА: Число вне диапазона возможных значений кубиков!', 0x0A, 0
     msg_err_bet_p db '!!! ОШИБКА: У вас недостаточно очков!', 0x0A, 0
     msg_err_bet_c db '!!! ОШИБКА: Казино не сможет выплатить выигрыш (ставка х4)! Уменьшите ставку.', 0x0A, 0
@@ -82,19 +83,39 @@ game_loop:
     mov rdi, newline
     call print_string
 
-    ; 1. Ввод параметров кубиков
+input_dcount:
     mov rdi, msg_dcount
     call print_string
     call read_num
+    cmp rdx, 1              ; Проверка флага ошибки ввода
+    je .invalid_fmt_dcount
     cmp rax, 0
-    je close_input
+    je close_input          ; Выход, если ввели 0
     mov [dice_count], rax
+    jmp input_dsides
 
+.invalid_fmt_dcount:
+    mov rdi, msg_err_fmt
+    call print_string
+    jmp input_dcount
+
+input_dsides:
     mov rdi, msg_dsides
     call print_string
     call read_num
+    cmp rdx, 1              ; Проверка флага ошибки ввода
+    je .invalid_fmt_dsides
+    cmp rax, 2              ; Защита: граней не может быть меньше 2
+    jl .invalid_fmt_dsides
     mov [dice_sides], rax
+    jmp calc_threshold
 
+.invalid_fmt_dsides:
+    mov rdi, msg_err_fmt
+    call print_string
+    jmp input_dsides
+
+calc_threshold:
     ; 2. Расчет границ и порога
     mov rax, [dice_count]
     mov rbx, [dice_sides]
@@ -130,6 +151,8 @@ input_guess:
     mov rdi, msg_guess
     call print_string
     call read_num
+    cmp rdx, 1              ; Проверка флага ошибки ввода
+    je .invalid_fmt_guess
 
     ; ПРОВЕРКА ДИАПАЗОНА
     cmp rax, [dice_count]
@@ -144,10 +167,21 @@ input_guess:
     call print_string
     jmp input_guess
 
+.invalid_fmt_guess:
+    mov rdi, msg_err_fmt
+    call print_string
+    jmp input_guess
+
+
 input_bet:
     mov rdi, msg_bet
     call print_string
     call read_num
+    cmp rdx, 1              ; Проверка флага ошибки ввода
+    je .invalid_fmt_bet
+
+    cmp rax, 1              ; Ставка не может быть 0
+    jl .invalid_fmt_bet
 
     ; Проверка средств игрока
     cmp rax, [balance]
@@ -169,6 +203,11 @@ input_bet:
 
 .invalid_bet_c:
     mov rdi, msg_err_bet_c
+    call print_string
+    jmp input_bet
+
+.invalid_fmt_bet:
+    mov rdi, msg_err_fmt
     call print_string
     jmp input_bet
 
@@ -215,7 +254,6 @@ roll_process:
     mov rdi, newline
     call print_string
 
-    ; ---- ИГРОВАЯ ЛОГИКА ----
     mov rax, [dice_sum]
     mov rbx, [guess]
     mov rcx, [threshold]
@@ -281,10 +319,6 @@ exit_program:
     xor rdi, rdi
     syscall
 
-; =========================================
-; ПОДПРОГРАММЫ
-; =========================================
-
 print_string:
     push rax
     push rdi
@@ -341,33 +375,50 @@ print_num:
 read_num:
     push rbx
     push rcx
-    push rdx
     push rdi
     push rsi
+
     mov rax, 0
     mov rdi, 0
     mov rsi, buffer
-    mov rdx, 64
+    mov rdx, BUFFER_SIZE    ; Читаем больше данных, чтобы исключить зависания буфера
     syscall
+
+    test rax, rax
+    jle .read_error         ; Если ошибка чтения системного вызова
+
     xor rax, rax
+    xor rbx, rbx            ; RBX будем использовать как счетчик валидных цифр
     mov rsi, buffer
 .loop:
     movzx rcx, byte [rsi]
-    cmp rcx, 0x0A
-    je .done
+    cmp rcx, 0x0A           ; Конец строки (Enter)
+    je .check_empty
     cmp rcx, '0'
-    jl .done
+    jl .read_error          ; Если символ ДО '0' (буквы, минус, пробел) -> ОШИБКА
     cmp rcx, '9'
-    jg .done
+    jg .read_error          ; Если символ ПОСЛЕ '9' (буквы и тд) -> ОШИБКА
+
     sub rcx, '0'
     imul rax, 10
     add rax, rcx
     inc rsi
+    inc rbx                 ; Увеличиваем счетчик цифр
     jmp .loop
+
+.check_empty:
+    test rbx, rbx
+    jz .read_error          ; Если игрок нажал просто Enter без цифр -> ОШИБКА
+    xor rdx, rdx            ; rdx = 0 (Успешно)
+    jmp .done
+
+.read_error:
+    mov rdx, 1              ; rdx = 1 (Флаг ошибки)
+    xor rax, rax            ; Обнуляем результат на всякий случай
+
 .done:
     pop rsi
     pop rdi
-    pop rdx
     pop rcx
     pop rbx
     ret
