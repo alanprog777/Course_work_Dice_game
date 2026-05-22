@@ -116,7 +116,7 @@ calc_threshold:
     mov rax, [dice_count]
     mov rbx, [dice_sides]
     mul rbx
-    mov [max_possible], rax     ; Max = count * sides
+    mov [max_possible], rax
 
     ; Порог = (Min + Max) / 2
     mov rbx, [max_possible]
@@ -150,7 +150,7 @@ input_guess:
     cmp rdx, 1
     je .invalid_fmt_guess
 
-    ; --- ПРОВЕРКА ВАЛИДНОСТИ ЧИСЛА ---
+    ;проверка валидности числа
     cmp rax, [dice_count]
     jl .invalid_range
     cmp rax, [max_possible]
@@ -262,7 +262,7 @@ roll_process:
     mov rax, [bet]
     shl rax, 2
     add [balance], rax
-    call save_balance           ; СОХРАНЯЕМ ИЗМЕНЕНИЯ В ФАЙЛ
+    call save_balance
     jmp game_loop
 
 .win_x1:
@@ -270,7 +270,7 @@ roll_process:
     call print_string
     mov rax, [bet]
     add [balance], rax
-    call save_balance           ; СОХРАНЯЕМ ИЗМЕНЕНИЯ В ФАЙЛ
+    call save_balance
     jmp game_loop
 
 .lose:
@@ -278,7 +278,7 @@ roll_process:
     call print_string
     mov rax, [bet]
     sub [balance], rax
-    call save_balance           ; СОХРАНЯЕМ ИЗМЕНЕНИЯ В ФАЙЛ
+    call save_balance
     jmp game_loop
 
 game_over:
@@ -295,11 +295,7 @@ exit_program:
     xor rdi, rdi
     syscall
 
-; =========================================
-; ПОДПРОГРАММЫ (Хелперы и Файловая система)
-; =========================================
-
-; --- ЗАГРУЗКА БАЛАНСА ИЗ ФАЙЛА ---
+; загрузка баланса из файла
 load_balance:
     ; Пытаемся открыть файл на чтение
     mov rax, 2                  ; sys_open
@@ -331,7 +327,7 @@ load_balance:
     mov qword [balance], 100    ; Баланс по умолчанию
     ret
 
-; --- СОХРАНЕНИЕ БАЛАНСА В ФАЙЛ ---
+; сохранение баланса в файл
 save_balance:
     push rax
     push rdi
@@ -361,7 +357,7 @@ save_balance:
     pop rax
     ret
 
-; --- ВЫВОД СТРОКИ ---
+; вывод ставки
 print_string:
     push rax
     push rdi
@@ -385,7 +381,7 @@ print_string:
     pop rax
     ret
 
-; --- ВЫВОД ЧИСЛА ---
+; вывод числа
 print_num:
     push rax
     push rbx
@@ -416,7 +412,7 @@ print_num:
     pop rax
     ret
 
-; --- БЕЗОПАСНЫЙ ВВОД ЧИСЛА С ПРОВЕРКОЙ ---
+; безопасный вывод числа с проверкой
 read_num:
     push rbx
     push rcx
